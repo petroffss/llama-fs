@@ -5,9 +5,10 @@ from collections import defaultdict
 
 import agentops
 import colorama
-import ollama
+# import ollama # No longer directly used in this file
 import weave
 from groq import AsyncGroq, Groq
+from src.ollama_llm import OllamaLLM # Added
 from llama_index.core import Document, SimpleDirectoryReader
 from llama_index.core.schema import ImageDocument
 from llama_index.core.node_parser import TokenTextSplitter
@@ -135,51 +136,19 @@ Write your response a JSON object with the following schema:
     return summary
 
 
-async def summarize_image_document(doc: ImageDocument, client):
-    PROMPT = """
-You will be provided with an image along with its metadata. Provide a summary of the image contents. The purpose of the summary is to organize files based on their content. To this end provide a concise but informative summary. Make the summary as specific to the file as possible.
-
-Write your response a JSON object with the following schema:
-
-```json
-{
-    "file_path": "path to the file including name",
-    "summary": "summary of the content"
-}
-```
-""".strip()
-
-    client = ollama.AsyncClient()
-    chat_completion = await client.chat(
-        messages=[
-            # {"role": "system", "content": "Respond with one short sentence."},
-            {
-                "role": "user",
-                "content": "Summarize the contents of this image.",
-                "images": [doc.image_path],
-            },
-        ],
-        model="moondream",
-        # format="json",
-        # stream=True,
-        options={"num_predict": 128},
-    )
-
-    summary = {
-        "file_path": doc.image_path,
-        "summary": chat_completion["message"]["content"],
-    }
-
-    print(colored(summary["file_path"], "green"))  # Print the filename in green
-    print(summary["summary"])  # Print the summary of the contents
-    print("-" * 80 + "\n")  # Print a separator line with spacing for readability
-    return summary
-
-
-async def dispatch_summarize_document(doc, client):
+async def dispatch_summarize_document(doc, client): # client is Groq client
     if isinstance(doc, ImageDocument):
-        return await summarize_image_document(doc, client)
+        # Use OllamaLLM for image summarization
+        # The 'client' variable here is the Groq client, not needed for OllamaLLM
+        ollama_llm = OllamaLLM(model_name="moondream") # Or appropriate image model
+        summary_data = await ollama_llm.summarize_image(image_path=doc.image_path)
+        # The print statements are for consistency with summarize_document, can be refactored later
+        print(colored(summary_data["file_path"], "green"))
+        print(summary_data["summary"])
+        print("-" * 80 + "\n")
+        return summary_data
     elif isinstance(doc, Document):
+        # Text document summarization using Groq client passed as 'client'
         return await summarize_document({"content": doc.text, **doc.metadata}, client)
     else:
         raise ValueError("Document type not supported")
@@ -233,10 +202,19 @@ def get_file_summary(path: str):
     return summary
 
 
-def dispatch_summarize_document_sync(doc, client):
+def dispatch_summarize_document_sync(doc, client): # client is Groq client
     if isinstance(doc, ImageDocument):
-        return summarize_image_document_sync(doc, client)
+        # Use OllamaLLM for image summarization (sync version)
+        # The 'client' variable here is the Groq client, not needed for OllamaLLM
+        ollama_llm = OllamaLLM(model_name="moondream") # Or appropriate image model
+        summary_data = ollama_llm.summarize_image_sync(image_path=doc.image_path)
+        # The print statements are for consistency with summarize_document_sync, can be refactored later
+        print(colored(summary_data["file_path"], "green"))
+        print(summary_data["summary"])
+        print("-" * 80 + "\n")
+        return summary_data
     elif isinstance(doc, Document):
+        # Text document summarization using Groq client passed as 'client'
         return summarize_document_sync({"content": doc.text, **doc.metadata}, client)
     else:
         raise ValueError("Document type not supported")
@@ -274,33 +252,5 @@ Write your response a JSON object with the following schema:
     except KeyError as e:
         print(e)
         print(summary)
-
-    return summary
-
-
-def summarize_image_document_sync(doc: ImageDocument, client):
-    client = ollama.Client()
-    chat_completion = client.chat(
-        messages=[
-            {
-                "role": "user",
-                "content": "Summarize the contents of this image.",
-                "images": [doc.image_path],
-            },
-        ],
-        model="moondream",
-        # format="json",
-        # stream=True,
-        options={"num_predict": 128},
-    )
-
-    summary = {
-        "file_path": doc.image_path,
-        "summary": chat_completion["message"]["content"],
-    }
-
-    print(colored(summary["file_path"], "green"))  # Print the filename in green
-    print(summary["summary"])  # Print the summary of the contents
-    print("-" * 80 + "\n")  # Print a separator line with spacing for readability
 
     return summary
