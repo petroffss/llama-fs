@@ -49,10 +49,9 @@ def main(src_path, dst_path, auto_yes=False):
     tr = LeftAligned(draw=BoxStyle(gfx=BOX_LIGHT, horiz_len=1))
     print(tr(tree))
 
-    # Prepend base path to dst_path
-    for file in files:
-        file["dst_path"] = os.path.join(src_path, file["dst_path"])
-        file["summary"] = summaries[files.index(file)]["summary"]
+    # Associate summaries with the proposed files
+    for idx, file in enumerate(files):
+        file["summary"] = summaries[idx]["summary"]
 
     if not auto_yes and not click.confirm(
         "Proceed with directory structure?", default=True
